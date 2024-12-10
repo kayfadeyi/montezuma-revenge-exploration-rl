@@ -41,6 +41,8 @@ def train(env_name='MontezumaRevenge-v0',
 
     # Training loop
     total_steps = 0
+    best_reward = float('-inf')
+    
     for episode in tqdm(range(num_episodes)):
         state = env.reset()
         state = frame_stacker.reset()
@@ -48,7 +50,7 @@ def train(env_name='MontezumaRevenge-v0',
         done = False
 
         while not done:
-            # Select action
+            # Select action with epsilon-greedy
             epsilon = final_exploration + (initial_exploration - final_exploration) * \
                      max(0, (exploration_steps - total_steps)) / exploration_steps
             
@@ -58,7 +60,7 @@ def train(env_name='MontezumaRevenge-v0',
                 with torch.no_grad():
                     action = online_net(state.unsqueeze(0)).argmax().item()
 
-            # Take step
+            # Take step in environment
             next_state, reward, done, info = env.step(action)
             next_state = frame_stacker.add_frame(next_state)
 
@@ -96,7 +98,7 @@ def train(env_name='MontezumaRevenge-v0',
                 next_q = target_net(next_state_batch).gather(1, next_actions.unsqueeze(1)).squeeze(1)
                 expected_q = reward_batch + gamma * next_q * (1 - done_batch)
 
-                # Compute loss
+                # Compute loss and update priorities
                 loss = (torch.tensor(weights, device=device) * \
                        (current_q.squeeze() - expected_q) ** 2).mean()
 
@@ -105,15 +107,27 @@ def train(env_name='MontezumaRevenge-v0',
                 loss.backward()
                 optimizer.step()
 
-                # Update priorities
+                # Update priorities in replay buffer
                 priorities = (current_q.squeeze() - expected_q).abs().detach().cpu().numpy()
                 memory.update_priorities(indices, priorities)
 
-            # Update target network
+            # Update target network periodically
             if total_steps % 10000 == 0:
                 target_net.load_state_dict(online_net.state_dict())
 
-        # Save model
+        # Save model if best reward achieved
+        if episode_reward > best_reward:
+            best_reward = episode_reward
+            torch.save({
+                'online_net': online_net.state_dict(),
+                'target_net': target_net.state_dict(),
+                'optimizer': optimizer.state_dict(),
+                'episode': episode,
+                'total_steps': total_steps,
+                'best_reward': best_reward
+            }, 'checkpoints/model_best.pt')
+
+        # Save periodic checkpoint
         if episode % 100 == 0:
             torch.save({
                 'online_net': online_net.state_dict(),
@@ -123,7 +137,7 @@ def train(env_name='MontezumaRevenge-v0',
                 'total_steps': total_steps
             }, f'checkpoints/model_episode_{episode}.pt')
 
-        print(f'Episode {episode}, Total Reward: {episode_reward}, Steps: {total_steps}')
+        print(f'Episode {episode}, Reward: {episode_reward}, Steps: {total_steps}, Epsilon: {epsilon:.3f}')
 
 if __name__ == '__main__':
     train()
