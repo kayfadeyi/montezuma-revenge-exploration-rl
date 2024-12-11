@@ -78,9 +78,26 @@ The evaluation script will:
 - Normalized reward combination
 
 ### Experience Replay
-- Prioritized experience replay using sum tree
+- Prioritised experience replay using sum tree
 - Importance sampling for unbiased updates
 - Priority annealing during training
+
+### References
+Van Hasselt, H., Guez, A. and Silver, D., 2016. Deep reinforcement learning with double Q-learning. Proceedings of the AAAI Conference on Artificial Intelligence, 30(1), pp.2094-2100.
+
+Wang, Z., Schaul, T., Hessel, M., Hasselt, H., Lanctot, M. and Freitas, N., 2016. Dueling network architectures for deep reinforcement learning. International Conference on Machine Learning, pp.1995-2003.
+
+Pathak, D., Agrawal, P., Efros, A.A. and Darrell, T., 2017. Curiosity-driven exploration by self-supervised prediction. International Conference on Machine Learning, pp.2778-2787.
+
+Burda, Y., Edwards, H., Storkey, A. and Klimov, O., 2019. Exploration by random network distillation. International Conference on Learning Representations.
+
+Schaul, T., Quan, J., Antonoglou, I. and Silver, D., 2016. Prioritized experience replay. International Conference on Learning Representations.
+
+Ecoffet, A., Huizinga, J., Lehman, J., Stanley, K.O. and Clune, J., 2019. Go-explore: a new approach for hard-exploration problems. arXiv preprint arXiv:1901.10995.
+
+Kulkarni, T.D., Narasimhan, K., Saeedi, A. and Tenenbaum, J., 2016. Hierarchical deep reinforcement learning: Integrating temporal abstraction and intrinsic motivation. Advances in Neural Information Processing Systems, 29, pp.3675-3683.
+
+Mnih, V., Kavukcuoglu, K., Silver, D., Rusu, A.A., Veness, J., Bellemare, M.G., Graves, A., Riedmiller, M., Fidjeland, A.K., Ostrovski, G. and Petersen, S., 2015. Human-level control through deep reinforcement learning. Nature, 518(7540), pp.529-533.
 
 ## License
 
