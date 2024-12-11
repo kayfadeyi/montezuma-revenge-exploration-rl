@@ -1,4 +1,7 @@
 #!/bin/bash
 
-# Use python3 instead of python
+# Go to the root directory of the project
+cd "$(dirname "$0")/.."
+
+# Run training script
 python3 src/train.py
