@@ -1,7 +1,4 @@
 #!/bin/bash
 
-# Activate virtual environment if needed
-# source venv/bin/activate
-
-# Run training
-python src/train.py
+# Use python3 instead of python
+python3 src/train.py
