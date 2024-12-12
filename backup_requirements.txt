@@ -1,0 +1,15 @@
+# Instead of gym[atari]>=0.21.0, use:
+gymnasium[atari]>=0.29.1
+torch>=1.9.0
+opencv-python>=4.5.3
+numpy>=1.19.5
+tqdm>=4.62.0
+matplotlib>=3.4.3
+<<<<<<< HEAD
+=======
+
+
+
+
+
+>>>>>>> 6ef4dbf (Complete implementation with working environment setup, training, and evaluation)
