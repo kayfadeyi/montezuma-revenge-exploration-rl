@@ -4,15 +4,17 @@ import torch.nn.functional as F
 import numpy as np
 
 class FeatureEncoder(nn.Module):
-    """Encodes states into latent feature representations"""
+    """Enhanced feature encoder with larger network"""
     def __init__(self, input_channels=4, feature_dim=512):
         super(FeatureEncoder, self).__init__()
         
         self.conv1 = nn.Conv2d(input_channels, 32, kernel_size=8, stride=4)
+        self.bn1 = nn.BatchNorm2d(32)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=4, stride=2)
+        self.bn2 = nn.BatchNorm2d(64)
         self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=1)
+        self.bn3 = nn.BatchNorm2d(64)
         
-        # Calculate feature size after convolutions
         def conv2d_size_out(size, kernel_size, stride):
             return (size - kernel_size) // stride + 1
         
@@ -20,40 +22,44 @@ class FeatureEncoder(nn.Module):
         convh = conv2d_size_out(conv2d_size_out(conv2d_size_out(84, 8, 4), 4, 2), 3, 1)
         linear_input_size = convw * convh * 64
         
-        self.fc = nn.Linear(linear_input_size, feature_dim)
+        self.fc1 = nn.Linear(linear_input_size, feature_dim)
+        self.dropout = nn.Dropout(0.2)
         
     def forward(self, x):
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = F.relu(self.conv3(x))
+        x = F.relu(self.bn1(self.conv1(x)))
+        x = F.relu(self.bn2(self.conv2(x)))
+        x = F.relu(self.bn3(self.conv3(x)))
         x = x.view(x.size(0), -1)
-        features = self.fc(x)
+        x = self.dropout(x)
+        features = F.relu(self.fc1(x))
         return features
 
 class ForwardDynamics(nn.Module):
-    """Predicts next state features given current state features and action"""
-    def __init__(self, feature_dim=512, action_dim=18, hidden_dim=512):  # Changed action_dim to 18
+    """Enhanced forward dynamics model"""
+    def __init__(self, feature_dim=512, action_dim=18, hidden_dim=512):
         super(ForwardDynamics, self).__init__()
         
         self.fc1 = nn.Linear(feature_dim + action_dim, hidden_dim)
         self.fc2 = nn.Linear(hidden_dim, hidden_dim)
         self.fc3 = nn.Linear(hidden_dim, feature_dim)
-        self.action_dim = action_dim  # Store action_dim
+        self.dropout = nn.Dropout(0.2)
+        self.action_dim = action_dim
         
     def forward(self, state_features, action):
-        # Convert action to one-hot if discrete
         if action.dim() == 1:
             action = F.one_hot(action.long(), num_classes=self.action_dim).float()
         
         x = torch.cat([state_features, action], dim=1)
         x = F.relu(self.fc1(x))
+        x = self.dropout(x)
         x = F.relu(self.fc2(x))
+        x = self.dropout(x)
         next_features = self.fc3(x)
         return next_features
 
 class CuriosityModule:
-    """Implements curiosity-driven exploration"""
-    def __init__(self, state_shape, action_dim, device="cuda"):
+    """Enhanced curiosity module with stronger rewards"""
+    def __init__(self, state_shape, action_dim, device="cuda", learning_rate=0.001):
         self.device = device
         self.feature_dim = 512
         self.action_dim = action_dim
@@ -64,39 +70,71 @@ class CuriosityModule:
         self.forward_dynamics = ForwardDynamics(feature_dim=self.feature_dim,
                                               action_dim=action_dim).to(device)
         
-        # Optimizers
-        self.encoder_opt = torch.optim.Adam(self.encoder.parameters(), lr=1e-4)
-        self.forward_opt = torch.optim.Adam(self.forward_dynamics.parameters(), lr=1e-4)
+        # Optimizers with higher learning rate
+        self.encoder_opt = torch.optim.Adam(self.encoder.parameters(), lr=learning_rate)
+        self.forward_opt = torch.optim.Adam(self.forward_dynamics.parameters(), lr=learning_rate)
         
-        # Normalize intrinsic rewards
-        self.reward_normalizer = RunningNormalizer()
+        # Enhanced reward normalization
+        self.reward_normalizer = RunningNormalizer(scale=2.0)  # Increased scale
+        self.reward_memory = deque(maxlen=1000)  # Track recent rewards
         
     def compute_intrinsic_reward(self, state, action, next_state):
-        """Compute intrinsic reward based on prediction error"""
+        """Compute enhanced intrinsic reward"""
         with torch.no_grad():
-            # Extract features
             state_features = self.encoder(state)
             next_state_features = self.encoder(next_state)
             
-            # Predict next state features
             predicted_features = self.forward_dynamics(state_features, action)
             
-            # Compute prediction error (intrinsic reward)
-            prediction_error = F.mse_loss(predicted_features, next_state_features, 
-                                        reduction='none').mean(dim=1)
+            # Compute prediction error with L1 and L2 components
+            l1_error = F.l1_loss(predicted_features, next_state_features, reduction='none').mean(dim=1)
+            l2_error = F.mse_loss(predicted_features, next_state_features, reduction='none').mean(dim=1)
+            prediction_error = (l1_error + l2_error) / 2
             
-            # Normalize reward
-            normalized_reward = self.reward_normalizer(prediction_error.cpu().numpy())
+            # Apply enhanced normalization
+            reward = self.reward_normalizer(prediction_error.cpu().numpy())
+            self.reward_memory.extend(reward)
             
-        return torch.FloatTensor(normalized_reward).to(self.device)
+            # Scale reward based on recent history
+            if len(self.reward_memory) > 100:
+                reward_std = np.std(self.reward_memory)
+                reward = reward * (1 + reward_std)
+            
+        return torch.FloatTensor(reward).to(self.device)
+    
+    def update(self, state, action, next_state):
+        """Update dynamics model with increased learning"""
+        state_features = self.encoder(state)
+        next_state_features = self.encoder(next_state)
+        
+        predicted_features = self.forward_dynamics(state_features, action)
+        
+        # Enhanced loss computation
+        l1_loss = F.l1_loss(predicted_features, next_state_features.detach())
+        l2_loss = F.mse_loss(predicted_features, next_state_features.detach())
+        forward_loss = l1_loss + l2_loss
+        
+        self.encoder_opt.zero_grad()
+        self.forward_opt.zero_grad()
+        forward_loss.backward()
+        
+        # Gradient clipping for stability
+        torch.nn.utils.clip_grad_norm_(self.encoder.parameters(), max_norm=1.0)
+        torch.nn.utils.clip_grad_norm_(self.forward_dynamics.parameters(), max_norm=1.0)
+        
+        self.encoder_opt.step()
+        self.forward_opt.step()
+        
+        return forward_loss.item()
 
 class RunningNormalizer:
-    """Normalizes rewards using running statistics"""
-    def __init__(self, epsilon=1e-8):
+    """Enhanced reward normalizer"""
+    def __init__(self, epsilon=1e-8, scale=2.0):
         self.mean = 0
         self.std = 1
         self.count = 0
         self.epsilon = epsilon
+        self.scale = scale
         
     def __call__(self, x):
         self.count += 1
@@ -108,4 +146,7 @@ class RunningNormalizer:
             self.mean = old_mean + (np.mean(x) - old_mean) / self.count
             self.std = np.sqrt(self.std**2 + ((x - old_mean) * (x - self.mean)).mean())
             
-        return (x - self.mean) / (self.std + self.epsilon)
+        normalized = (x - self.mean) / (self.std + self.epsilon)
+        return normalized * self.scale  # Apply scaling factor
+
+from collections import deque  # Add this at the top of the file

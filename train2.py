@@ -15,15 +15,19 @@ from montezuma_rl.memory.prioritized_replay import PrioritizedReplayBuffer
 from montezuma_rl.exploration.curiosity import CuriosityModule
 from montezuma_rl.utils.reward_combination import RewardCombiner
 
-# UPDATED: More aggressive step bonus calculation
+def get_current_difficulty(episode, success_rate):
+    """Calculate current difficulty based on episode number and success rate"""
+    base_difficulty = min(1.0, episode / 500)
+    return base_difficulty * (1 - success_rate)
+
 def calculate_step_bonus(steps):
-    """Calculate progressive bonus for longer episodes with increased rewards"""
-    if steps > 300:  # Lowered threshold from 500
-        bonus = 0.2 * (steps / 300)  # Doubled base bonus
-        if steps > 700:  # Lowered threshold from 1000
-            bonus += 0.4  # Doubled bonus
-        if steps > 1000:  # Lowered threshold from 1500
-            bonus += 0.6  # Doubled bonus
+    """Enhanced progressive bonus calculation for longer episodes"""
+    if steps > 300:
+        bonus = 0.2 * (steps / 300)
+        if steps > 700:
+            bonus += 0.4
+        if steps > 1000:
+            bonus += 0.6
         return bonus
     return 0.0
 
@@ -58,7 +62,7 @@ def setup_logging():
         ]
     )
 
-def train(num_episodes=1500,  # Reduced from 2000 for faster iteration
+def train(num_episodes=1500,
           batch_size=32,
           gamma=0.99,
           initial_exploration=1.0,
@@ -66,30 +70,29 @@ def train(num_episodes=1500,  # Reduced from 2000 for faster iteration
           exploration_steps=2000000,
           target_update_frequency=5000,
           learning_rate=0.0001,
-          min_exploration_ratio=0.4,
+          min_exploration_ratio=0.6,  # Increased from 0.4
           checkpoint_path='checkpoints/training_state.pt'):
     """
-    Enhanced training with aggressive exploration and rewards
+    Enhanced training with improved exploration and reward mechanisms
     """
     setup_logging()
-    
-    # Backup existing checkpoint
     backup_checkpoint(checkpoint_path)
     
-    logging.info("Starting training with enhanced aggressive parameters:")
+    logging.info("Starting enhanced training with new parameters:")
     logging.info(f"Episodes: {num_episodes}, Batch size: {batch_size}, Gamma: {gamma}")
     logging.info(f"Exploration: {initial_exploration} -> {final_exploration} over {exploration_steps} steps")
     logging.info(f"Target update frequency: {target_update_frequency}")
     logging.info(f"Min exploration ratio: {min_exploration_ratio}")
 
-    # Create directories
     Path('checkpoints').mkdir(exist_ok=True)
+    Path('checkpoints/success_models').mkdir(exist_ok=True)
 
-    # Initialize tracking with enhanced history
-    position_history = set()  # Track unique positions
-    last_steps = deque(maxlen=10)  # Increased from 5 for better momentum tracking
-    position_streak = 0  # Track consecutive new positions
-
+    # Enhanced tracking
+    position_history = set()
+    last_steps = deque(maxlen=10)
+    position_streak = 0
+    successful_episodes = []
+    
     try:
         logging.info("Creating environment: MontezumaRevenge-v4")
         env = gym.make('MontezumaRevenge-v4',
@@ -110,33 +113,29 @@ def train(num_episodes=1500,  # Reduced from 2000 for faster iteration
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     logging.info(f"Using device: {device}")
 
-    # Initialize networks
     online_net = DuelingDQN().to(device)
     target_net = DuelingDQN().to(device)
     target_net.load_state_dict(online_net.state_dict())
 
-    # Enhanced curiosity module with higher learning rate
     curiosity = CuriosityModule(
         state_shape=(4, 84, 84),
         action_dim=env.action_space.n,
         device=device,
-        learning_rate=learning_rate * 15  # Increased multiplier
+        learning_rate=learning_rate * 15
     )
     reward_combiner = RewardCombiner(beta=0.8)
 
-    # Larger replay buffer
     memory = PrioritizedReplayBuffer(200000)
     optimizer = torch.optim.Adam(online_net.parameters(), lr=learning_rate)
 
-    # Training metrics
+    # Enhanced metrics tracking
     best_reward = float('-inf')
     episode_rewards = []
     total_steps = 0
     start_episode = 0
-    recent_rewards = deque(maxlen=100)
+    recent_rewards = deque(maxlen=200)  # Increased from 100
     exploration_actions = deque(maxlen=1000)
 
-    # Load checkpoint if exists
     checkpoint = load_checkpoint(checkpoint_path)
     if checkpoint:
         online_net.load_state_dict(checkpoint['online_net_state_dict'])
@@ -146,10 +145,10 @@ def train(num_episodes=1500,  # Reduced from 2000 for faster iteration
         total_steps = checkpoint['total_steps']
         best_reward = checkpoint.get('best_reward', float('-inf'))
         episode_rewards = checkpoint.get('episode_rewards', [])
+        successful_episodes = checkpoint.get('successful_episodes', [])
         logging.info(f"Resuming from episode {start_episode}")
 
-    # Enhanced early stopping with longer patience
-    patience = 1500  # Increased from 1000
+    patience = 1500
     episodes_without_improvement = 0
     min_reward_threshold = 100
 
@@ -162,15 +161,22 @@ def train(num_episodes=1500,  # Reduced from 2000 for faster iteration
         done = False
         truncated = False
         positions_this_episode = set()
+        episode_transitions = []
+
+        # Calculate success rate for difficulty adjustment
+        success_rate = len([r for r in recent_rewards if r > 0]) / len(recent_rewards) if recent_rewards else 0
+        current_difficulty = get_current_difficulty(episode, success_rate)
 
         while not (done or truncated):
-            # Enhanced exploration strategy
-            epsilon = max(
-                final_exploration,
-                initial_exploration * (1 - total_steps / exploration_steps)
-            )
+            # Enhanced exploration strategy with warmup
+            if episode < 200:
+                epsilon = initial_exploration
+            else:
+                epsilon = max(
+                    final_exploration,
+                    initial_exploration * (1 - (total_steps - 200*episode_steps) / exploration_steps)
+                )
             
-            # Action selection with tracking
             if np.random.random() < epsilon:
                 action = env.action_space.sample()
                 episode_random_actions += 1
@@ -181,96 +187,84 @@ def train(num_episodes=1500,  # Reduced from 2000 for faster iteration
 
             exploration_actions.append(1 if np.random.random() < epsilon else 0)
 
-            # Environment step
             next_state, reward, done, truncated, info = env.step(action)
 
-            # Enhanced reward calculation
             state_tensor = torch.FloatTensor(state).unsqueeze(0).to(device)
             next_state_tensor = torch.FloatTensor(next_state).unsqueeze(0).to(device)
             
-            # UPDATED: Enhanced position-based reward
+            # Enhanced position-based reward
             if 'x' in info and 'y' in info:
                 position = (info['x'], info['y'])
                 if position not in position_history:
                     position_history.add(position)
                     positions_this_episode.add(position)
                     position_streak += 1
-                    combined_reward = 0.4  # Doubled position bonus
+                    combined_reward = 0.4
                     
-                    # Bonus for finding multiple new positions
-                    if len(positions_this_episode) % 3 == 0:  # Changed from 5 to 3
+                    if len(positions_this_episode) % 3 == 0:
                         combined_reward += 0.5
                     
-                    # Streak bonus
                     if position_streak >= 3:
                         combined_reward += 0.3 * position_streak
                 else:
                     position_streak = 0
 
-            # Intrinsic reward
             intrinsic_reward = curiosity.compute_intrinsic_reward(
                 state_tensor,
                 torch.tensor([action]).to(device),
                 next_state_tensor
             )
 
-            # Combine rewards
             combined_reward = reward_combiner.combine_rewards(
                 np.array([reward]),
                 intrinsic_reward.cpu().numpy()
             )[0]
 
-            # UPDATED: More aggressive step bonus
             step_bonus = calculate_step_bonus(episode_steps)
             combined_reward += step_bonus
 
-            # UPDATED: Enhanced momentum bonus
             if len(last_steps) > 0:
                 avg_steps = sum(last_steps) / len(last_steps)
                 if episode_steps > avg_steps:
                     momentum_bonus = 0.2 * (episode_steps - avg_steps) / avg_steps
                     combined_reward += momentum_bonus
 
-            # Store transition and update counters
-            memory.push(state, action, combined_reward, next_state, done or truncated)
+            # Store transition
+            transition = (state, action, combined_reward, next_state, done or truncated)
+            memory.push(*transition)
+            episode_transitions.append(len(memory) - 1)  # Store index for later priority updates
+            
             state = next_state
             episode_reward += reward
             episode_steps += 1
             total_steps += 1
 
-            # Enhanced training
             if len(memory) > batch_size:
                 batch, indices, weights = memory.sample(batch_size)
                 
-                # Prepare batch
                 state_batch = torch.FloatTensor(np.array([t.state for t in batch])).to(device)
                 action_batch = torch.LongTensor([t.action for t in batch]).to(device)
                 reward_batch = torch.FloatTensor([t.reward for t in batch]).to(device)
                 next_state_batch = torch.FloatTensor(np.array([t.next_state for t in batch])).to(device)
                 done_batch = torch.FloatTensor([t.done for t in batch]).to(device)
 
-                # Compute Q values with double Q-learning
                 current_q = online_net(state_batch).gather(1, action_batch.unsqueeze(1))
                 with torch.no_grad():
                     next_actions = online_net(next_state_batch).max(1)[1]
                     next_q = target_net(next_state_batch).gather(1, next_actions.unsqueeze(1)).squeeze(1)
                     expected_q = reward_batch + gamma * next_q * (1 - done_batch)
 
-                # Compute loss with prioritized replay
                 loss = (torch.tensor(weights, device=device) * 
                        (current_q.squeeze() - expected_q.detach()) ** 2).mean()
 
-                # Optimize
                 optimizer.zero_grad()
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(online_net.parameters(), max_norm=10.0)
                 optimizer.step()
 
-                # Update priorities
                 priorities = (current_q.squeeze() - expected_q).abs().detach().cpu().numpy()
                 memory.update_priorities(indices, priorities)
 
-            # More frequent target updates
             if total_steps % target_update_frequency == 0:
                 target_net.load_state_dict(online_net.state_dict())
                 logging.info("Updated target network")
@@ -284,14 +278,31 @@ def train(num_episodes=1500,  # Reduced from 2000 for faster iteration
         # Enhanced logging
         logging.info(f'Episode {episode} - Reward: {episode_reward:.2f}, '
                     f'Steps: {episode_steps}, Epsilon: {epsilon:.3f}, '
-                    f'Avg Reward (100): {avg_reward:.2f}, '
+                    f'Avg Reward (200): {avg_reward:.2f}, '
                     f'Exploration Ratio: {exploration_ratio:.2f}, '
+                    f'Success Rate: {success_rate:.2f}, '
+                    f'Difficulty: {current_difficulty:.2f}, '
                     f'New Positions: {len(positions_this_episode)}')
 
+        # Enhanced success tracking
         if episode_reward > 0:
             logging.info(f"Non-zero reward achieved: {episode_reward}")
+            successful_episodes.append((episode, episode_reward, episode_steps))
+            
+            # Increase priority for successful transitions
+            for idx in episode_transitions:
+                memory.update_priorities([idx], [2.0])
+            
+            # Save successful model
+            torch.save({
+                'episode': episode,
+                'online_net_state_dict': online_net.state_dict(),
+                'target_net_state_dict': target_net.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'total_steps': total_steps,
+                'reward': episode_reward
+            }, f'checkpoints/success_models/success_model_ep{episode}.pt')
 
-        # Save best model
         if episode_reward > best_reward:
             best_reward = episode_reward
             episodes_without_improvement = 0
@@ -302,33 +313,32 @@ def train(num_episodes=1500,  # Reduced from 2000 for faster iteration
                 'optimizer_state_dict': optimizer.state_dict(),
                 'best_reward': best_reward,
                 'episode_rewards': episode_rewards,
+                'successful_episodes': successful_episodes,
                 'total_steps': total_steps
             }, 'checkpoints/model_best.pt')
             logging.info(f"New best reward: {best_reward:.2f}")
         else:
             episodes_without_improvement += 1
 
-        # Regular checkpointing with backup
         if episode % 100 == 0:
-            backup_checkpoint(checkpoint_path)  # Backup before saving new checkpoint
+            backup_checkpoint(checkpoint_path)
             torch.save({
                 'episode': episode,
                 'online_net_state_dict': online_net.state_dict(),
                 'target_net_state_dict': target_net.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'episode_rewards': episode_rewards,
+                'successful_episodes': successful_episodes,
                 'total_steps': total_steps,
                 'best_reward': best_reward
             }, checkpoint_path)
             logging.info(f"Saved checkpoint at episode {episode}")
 
-        # UPDATED: More aggressive exploration reset
         if exploration_ratio < min_exploration_ratio and episode > 500:
             logging.info("Restarting exploration due to low exploration ratio")
             epsilon = initial_exploration
-            position_streak = 0  # Reset streak on exploration reset
+            position_streak = 0
 
-        # Enhanced early stopping
         if episodes_without_improvement >= patience:
             logging.info("Stopping early due to no improvement")
             break
