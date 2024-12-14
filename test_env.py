@@ -1,32 +1,40 @@
 import gymnasium as gym
-from gymnasium.wrappers import AtariPreprocessing
-import sys
+import ale_py
+import unittest
 
-def test_environments():
-    try:
-        # Try to import and register Atari envs
-        import ale_py
-        from ale_py.roms import Montezuma
-        
-        print("Available environments:")
+
+class TestMontezumaRevengeEnv(unittest.TestCase):
+
+    def test_available_environments(self):
+        """Test that 'Montezuma' environments are available."""
         envs = [env for env in gym.envs.registry.keys() if 'Montezuma' in env]
-        print(envs)
-        
-        # Try to create the environment
-        print("\nTrying to create environment...")
-        env = gym.make('MontezumaRevenge-v4')
-        print("Environment created successfully!")
-        
-        # Print environment info
-        print("\nEnvironment info:")
-        print(f"Action space: {env.action_space}")
-        print(f"Observation space: {env.observation_space}")
-        
-    except Exception as e:
-        print(f"Error: {e}")
-        print(f"Type: {type(e)}")
-        print(f"Python version: {sys.version}")
-        print(f"Gymnasium version: {gym.__version__}")
-        
+        self.assertGreater(len(envs), 0, "No Montezuma environments available.")
+        print(f"Available environments: {envs}")
+
+    def test_environment_info(self):
+        """Test the action and observation space of the environment."""
+        try:
+            env = gym.make('ALE/MontezumaRevenge-v5')
+            action_space = env.action_space
+            observation_space = env.observation_space
+
+            self.assertIsNotNone(action_space, "Action space is None.")
+            self.assertIsNotNone(observation_space, "Observation space is None.")
+            print(f"Action space: {action_space}")
+            print(f"Observation space: {observation_space}")
+        except Exception as e:
+            self.fail(f"Error while testing environment info: {e}")
+
+    def test_ale_py_import(self):
+        """Test the import of ale_py and ALEInterface."""
+        try:
+            ale_interface = ale_py.ALEInterface()
+            self.assertIsNotNone(ale_interface, "Failed to create ALEInterface.")
+            print("ALEInterface created successfully!")
+        except Exception as e:
+            self.fail(f"Error while importing ALEInterface: {e}")
+
+
 if __name__ == "__main__":
-    test_environments()
+    # Run the test suite
+    unittest.main()

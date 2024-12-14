@@ -5,12 +5,16 @@ setup(
     packages=find_packages(),
     version="0.1.0",
     install_requires=[
-        "gymnasium[atari]>=0.29.1",
+        "gymnasium[atari]>=1.0.0",
+        "gymnasium[other]>=1.0.0",
         "torch>=1.9.0",
         "opencv-python>=4.5.3",
         "numpy>=1.19.5",
         "tqdm>=4.62.0",
-        "matplotlib>=3.4.3"
+        "matplotlib>=3.4.3",
+        "ale-py>=0.10.1",
+        "moviepy>=2.1.1",
+        "pillow>=9.2.0,<11.0"
     ],
 )
 

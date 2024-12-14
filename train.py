@@ -1,19 +1,24 @@
-import gymnasium as gym
-from gymnasium.wrappers import AtariPreprocessing, FrameStack
-import torch
-import numpy as np
-from tqdm import tqdm
-from pathlib import Path
 import logging
-from datetime import datetime
 import os
 import shutil
 from collections import deque
+from datetime import datetime
+from pathlib import Path
 
-from montezuma_rl.models.dqn import DuelingDQN
-from montezuma_rl.memory.prioritized_replay import PrioritizedReplayBuffer
+import gymnasium as gym
+import numpy as np
+import torch
+from ale_py import ALEInterface
+from gymnasium.wrappers import FrameStackObservation as FrameStack
+from gymnasium.wrappers import RecordEpisodeStatistics, RecordVideo
+from gymnasium.wrappers.atari_preprocessing import AtariPreprocessing
+from tqdm import tqdm
+
 from montezuma_rl.exploration.curiosity import CuriosityModule
+from montezuma_rl.memory.prioritized_replay import PrioritizedReplayBuffer
+from montezuma_rl.models.dqn import DuelingDQN
 from montezuma_rl.utils.reward_combination import RewardCombiner
+
 
 # UPDATED: More aggressive step bonus calculation
 def calculate_step_bonus(steps):
@@ -27,6 +32,7 @@ def calculate_step_bonus(steps):
         return bonus
     return 0.0
 
+
 def backup_checkpoint(src_path, backup_dir='checkpoints/backups'):
     """Create a backup of checkpoint file"""
     if os.path.exists(src_path):
@@ -36,6 +42,7 @@ def backup_checkpoint(src_path, backup_dir='checkpoints/backups'):
         shutil.copy2(src_path, backup_path)
         logging.info(f"Created checkpoint backup: {backup_path}")
 
+
 def load_checkpoint(path):
     if os.path.exists(path):
         checkpoint = torch.load(path)
@@ -43,11 +50,12 @@ def load_checkpoint(path):
         return checkpoint
     return None
 
+
 def setup_logging():
     """Setup logging configuration"""
     log_dir = Path('logs')
     log_dir.mkdir(exist_ok=True)
-    
+
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     logging.basicConfig(
         level=logging.INFO,
@@ -58,7 +66,9 @@ def setup_logging():
         ]
     )
 
-def train(num_episodes=1500,  # Reduced from 2000 for faster iteration
+
+def train(atari_environment,
+          num_episodes=1500,  # Reduced from 2000 for faster iteration
           batch_size=32,
           gamma=0.99,
           initial_exploration=1.0,
@@ -72,10 +82,10 @@ def train(num_episodes=1500,  # Reduced from 2000 for faster iteration
     Enhanced training with aggressive exploration and rewards
     """
     setup_logging()
-    
+
     # Backup existing checkpoint
     backup_checkpoint(checkpoint_path)
-    
+
     logging.info("Starting training with enhanced aggressive parameters:")
     logging.info(f"Episodes: {num_episodes}, Batch size: {batch_size}, Gamma: {gamma}")
     logging.info(f"Exploration: {initial_exploration} -> {final_exploration} over {exploration_steps} steps")
@@ -92,17 +102,24 @@ def train(num_episodes=1500,  # Reduced from 2000 for faster iteration
 
     try:
         logging.info("Creating environment: MontezumaRevenge-v4")
-        env = gym.make('MontezumaRevenge-v4',
-                      frameskip=4,
-                      render_mode=None)
-        
-        env = AtariPreprocessing(env, 
-                               grayscale_obs=True,
-                               frame_skip=1,
-                               scale_obs=True)
-        env = FrameStack(env, num_stack=4)
+        env = gym.make(atari_environment, render_mode='rgb_array', frameskip=1)
+        env = AtariPreprocessing(
+            env,
+            noop_max=10,
+            frame_skip=4,
+            terminal_on_life_loss=True,
+            screen_size=84,
+            grayscale_obs=True,
+            grayscale_newaxis=False
+        )
+        env = FrameStack(env, stack_size=4)
+        # Disable video and statistics during training for efficiency
+        env = RecordEpisodeStatistics(env)
+        training_period = 50
+        env = RecordVideo(env, video_folder="videos/training", name_prefix="training",
+                          episode_trigger=lambda x: x % training_period == 0)
         logging.info("Environment created successfully")
-        
+
     except Exception as e:
         logging.error(f"Failed to create environment: {e}")
         raise
@@ -169,7 +186,7 @@ def train(num_episodes=1500,  # Reduced from 2000 for faster iteration
                 final_exploration,
                 initial_exploration * (1 - total_steps / exploration_steps)
             )
-            
+
             # Action selection with tracking
             if np.random.random() < epsilon:
                 action = env.action_space.sample()
@@ -187,7 +204,7 @@ def train(num_episodes=1500,  # Reduced from 2000 for faster iteration
             # Enhanced reward calculation
             state_tensor = torch.FloatTensor(state).unsqueeze(0).to(device)
             next_state_tensor = torch.FloatTensor(next_state).unsqueeze(0).to(device)
-            
+
             # UPDATED: Enhanced position-based reward
             if 'x' in info and 'y' in info:
                 position = (info['x'], info['y'])
@@ -196,11 +213,11 @@ def train(num_episodes=1500,  # Reduced from 2000 for faster iteration
                     positions_this_episode.add(position)
                     position_streak += 1
                     combined_reward = 0.4  # Doubled position bonus
-                    
+
                     # Bonus for finding multiple new positions
                     if len(positions_this_episode) % 3 == 0:  # Changed from 5 to 3
                         combined_reward += 0.5
-                    
+
                     # Streak bonus
                     if position_streak >= 3:
                         combined_reward += 0.3 * position_streak
@@ -241,7 +258,7 @@ def train(num_episodes=1500,  # Reduced from 2000 for faster iteration
             # Enhanced training
             if len(memory) > batch_size:
                 batch, indices, weights = memory.sample(batch_size)
-                
+
                 # Prepare batch
                 state_batch = torch.FloatTensor(np.array([t.state for t in batch])).to(device)
                 action_batch = torch.LongTensor([t.action for t in batch]).to(device)
@@ -257,8 +274,8 @@ def train(num_episodes=1500,  # Reduced from 2000 for faster iteration
                     expected_q = reward_batch + gamma * next_q * (1 - done_batch)
 
                 # Compute loss with prioritized replay
-                loss = (torch.tensor(weights, device=device) * 
-                       (current_q.squeeze() - expected_q.detach()) ** 2).mean()
+                loss = (torch.tensor(weights, device=device) *
+                        (current_q.squeeze() - expected_q.detach()) ** 2).mean()
 
                 # Optimize
                 optimizer.zero_grad()
@@ -283,10 +300,10 @@ def train(num_episodes=1500,  # Reduced from 2000 for faster iteration
 
         # Enhanced logging
         logging.info(f'Episode {episode} - Reward: {episode_reward:.2f}, '
-                    f'Steps: {episode_steps}, Epsilon: {epsilon:.3f}, '
-                    f'Avg Reward (100): {avg_reward:.2f}, '
-                    f'Exploration Ratio: {exploration_ratio:.2f}, '
-                    f'New Positions: {len(positions_this_episode)}')
+                     f'Steps: {episode_steps}, Epsilon: {epsilon:.3f}, '
+                     f'Avg Reward (100): {avg_reward:.2f}, '
+                     f'Exploration Ratio: {exploration_ratio:.2f}, '
+                     f'New Positions: {len(positions_this_episode)}')
 
         if episode_reward > 0:
             logging.info(f"Non-zero reward achieved: {episode_reward}")
@@ -340,5 +357,6 @@ def train(num_episodes=1500,  # Reduced from 2000 for faster iteration
     env.close()
     logging.info("Training completed")
 
+
 if __name__ == '__main__':
-    train()
+    train('ALE/MontezumaRevenge-v5 ')

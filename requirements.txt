@@ -1,9 +1,11 @@
-gymnasium[atari]>=0.29.1
+gymnasium[atari]>=1.0.0
+gymnasium[other]>=1.0.0
 torch>=1.9.0
 opencv-python>=4.5.3
 numpy>=1.19.5
 tqdm>=4.62.0
 matplotlib>=3.4.3
-ale-py>=0.8.0
 shimmy>=0.2.1
-AutoROM[accept-rom-license]
+ale-py>=0.10.1
+moviepy
+pillow>=9.2.0,<11.0.0
