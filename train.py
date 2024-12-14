@@ -62,11 +62,11 @@ def train(num_episodes=1500,  # Reduced from 2000 for faster iteration
           batch_size=32,
           gamma=0.99,
           initial_exploration=1.0,
-          final_exploration=0.2,
+          final_exploration=0.85,
           exploration_steps=2000000,
           target_update_frequency=5000,
           learning_rate=0.0001,
-          min_exploration_ratio=0.4,
+          min_exploration_ratio=0.9,
           checkpoint_path='checkpoints/training_state.pt'):
     """
     Enhanced training with aggressive exploration and rewards
