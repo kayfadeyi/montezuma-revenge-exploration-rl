@@ -185,6 +185,41 @@ python test_env.py
 - Modify exploration parameters
 - Change network architecture
 
+### Evaluation
+
+To evaluate a trained model, use the evaluate.py script. Here are the basic usage patterns:
+
+#### Basic Evaluation
+```bash
+# Basic evaluation with rendering
+python evaluate.py --model_path checkpoints/model_best.pt --render
+
+# Run specific number of episodes without rendering
+python evaluate.py --model_path checkpoints/model_best.pt --episodes 20
+
+# Run multiple episodes with rendering
+python evaluate.py --model_path checkpoints/model_best.pt --episodes 20 --render
+```
+
+#### Evaluation Parameters
+
+- `--model_path`: Path to checkpoint file (required)
+- `--episodes`: Number of evaluation episodes (default: 10)
+- `--render`: Flag to enable visualization of gameplay (optional)
+
+#### Evaluation Metrics
+
+The evaluation provides the following metrics:
+
+- Episode rewards and steps
+- Unique positions visited per episode
+- Average reward across all episodes
+- Average steps across all episodes
+- Maximum reward achieved
+- Maximum steps reached in any episode
+
+The evaluation results are printed to the console after completion, showing both per-episode statistics and overall performance metrics.
+
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
