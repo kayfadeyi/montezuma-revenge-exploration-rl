@@ -1,0 +1,35 @@
+login to ssh
+------------
+ssh to one of the msc servers - https://hex.cs.bath.ac.uk/usage
+e.g. ssh rwg27@ogg.cs.bath.ac.uk
+
+set up ssh key
+--------------
+ssh-keygen -t rsa -b 4096 -C "russell75uk@yahoo.co.uk"
+
+cat ~/.ssh/id_rsa.pub
+
+	copy to github -> settings -> ssh keys in github
+
+validate github access
+----------------------
+ssh -T git@github.com
+
+clone
+-----
+create dir and checkout repo
+
+git clone git@github.com:kayfadeyi/montezuma-revenge-exploration-rl.git
+
+
+create virtual env
+------------------
+python3 -m venv env
+
+source env/bin/activate
+
+install
+-------
+pip install -e .
+
+

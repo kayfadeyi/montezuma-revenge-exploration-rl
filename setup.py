@@ -9,7 +9,7 @@ setup(
         "gymnasium[other]>=1.0.0",
         "torch>=1.9.0",
         "opencv-python>=4.5.3",
-        "numpy>=1.19.5",
+        "numpy>=2.2.0",
         "tqdm>=4.62.0",
         "matplotlib>=3.4.3",
         "ale-py>=0.10.1",

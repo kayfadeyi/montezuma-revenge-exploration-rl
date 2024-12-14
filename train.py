@@ -73,7 +73,7 @@ class TrainModel:
         )
 
     def train(self,
-              num_episodes=1500,  # Reduced from 2000 for faster iteration
+              num_episodes=10000,
               batch_size=32,
               gamma=0.99,
               initial_exploration=1.0,
@@ -364,8 +364,11 @@ class TrainModel:
 
 
 if __name__ == '__main__':
-    tm = TrainModel('ALE/Breakout-v5')
-    #tm = TrainModel('MsPacman-v5')
-    #tm = TrainModel('ALE/MontezumaRevenge-v5')
-    tm.train()
+    tm_breakout = TrainModel('ALE/Breakout-v5')
+    tm_pacman = TrainModel('MsPacman-v5')
+    tm_montezuma = TrainModel('ALE/MontezumaRevenge-v5')
+
+    tm_breakout.train()
+    tm_pacman.train()
+    tm_montezuma.train()
 
