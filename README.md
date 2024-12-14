@@ -34,20 +34,15 @@ This project implements an advanced Deep Reinforcement Learning solution for Mon
 
 3. Install dependencies:
    ```bash
-   pip install gymnasium[atari]>=0.29.1
+   pip install gymnasium[atari]>=1.0.0
    pip install torch>=1.9.0
    pip install opencv-python>=4.5.3
    pip install numpy>=1.19.5
    pip install tqdm>=4.62.0
    pip install matplotlib>=3.4.3
-   pip install ale-py>=0.8.0
+   pip install ale-py>=0.10.1
    pip install shimmy>=0.2.1
    pip install "AutoROM[accept-rom-license]"
-   ```
-
-4. Download and install ROMs:
-   ```bash
-   python -m AutoROM --accept-license
    ```
 
 ## Project Structure
@@ -64,6 +59,7 @@ montezuma-revenge-exploration-rl/
 ├── train.py             # Training script
 ├── evaluate.py          # Evaluation script
 └── requirements.txt     # Project dependencies
+└── videos/              # Evaluation videos
 ```
 
 ## Running the Project
@@ -101,6 +97,10 @@ Configurable in `train.py`:
 - `gamma`: Discount factor (default: 0.99)
 - `initial_exploration`: Starting exploration rate (default: 1.0)
 - `final_exploration`: Final exploration rate (default: 0.01)
+- `exploration_steps`: Number of exploration steps (default: 2000000)
+- `target_update_frequency`: Target update frequency (default: 5000)
+- `learning_rate`: Learning rate (default: 0.0001)
+- `min_exploration_ratio`: Minimum exploration ratio (default: 0.9)
 
 ### Evaluation
 
