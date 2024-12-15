@@ -1,6 +1,7 @@
 import unittest
 import numpy as np
-from src.memory.prioritized_replay import PrioritizedReplayBuffer
+from memory.prioritized_replay import PrioritizedReplayBuffer
+
 
 class TestPrioritizedReplay(unittest.TestCase):
     def setUp(self):
@@ -31,6 +32,7 @@ class TestPrioritizedReplay(unittest.TestCase):
         self.buffer.push(state, 0, 1.0, next_state, False)
         _, indices, _ = self.buffer.sample(1)
         self.buffer.update_priorities(indices, [2.0])
+
 
 if __name__ == '__main__':
     unittest.main()

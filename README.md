@@ -163,11 +163,6 @@ Training will automatically stop if:
 
 ### Common Issues and Solutions
 
-#### ROM Loading Errors
-```bash
-python -m AutoROM --accept-license
-```
-
 #### Out of Memory
 
 - Reduce batch size

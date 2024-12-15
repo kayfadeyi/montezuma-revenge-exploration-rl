@@ -1,7 +1,8 @@
 import unittest
 import numpy as np
 import torch
-from src.utils.preprocessing import FrameStacker
+from utils.preprocessing import FrameStacker
+
 
 class TestFrameStacker(unittest.TestCase):
     def setUp(self):
@@ -25,6 +26,7 @@ class TestFrameStacker(unittest.TestCase):
         state = self.frame_stacker.reset()
         self.assertEqual(state.shape, (4, 84, 84))
         self.assertTrue(torch.all(state == 0))
+
 
 if __name__ == '__main__':
     unittest.main()

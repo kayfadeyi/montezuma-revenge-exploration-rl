@@ -1,6 +1,7 @@
 import unittest
 import torch
-from src.models.dqn import DuelingDQN
+from models.dqn import DuelingDQN
+
 
 class TestDuelingDQN(unittest.TestCase):
     def setUp(self):
@@ -18,7 +19,7 @@ class TestDuelingDQN(unittest.TestCase):
         x = torch.randn(1, *self.input_shape)
         value = self.model.value_stream(self.model.conv1(x).view(1, -1))
         advantage = self.model.advantage_stream(self.model.conv1(x).view(1, -1))
-        
+
         self.assertEqual(value.shape, (1, 1))
         self.assertEqual(advantage.shape, (1, 18))
 
@@ -28,6 +29,7 @@ class TestDuelingDQN(unittest.TestCase):
             x = torch.randn(1, *self.input_shape).cuda()
             output = model(x)
             self.assertTrue(output.is_cuda)
+
 
 if __name__ == '__main__':
     unittest.main()

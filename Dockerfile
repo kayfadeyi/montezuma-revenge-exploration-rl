@@ -8,6 +8,9 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# Upgrade pip to the latest version
+RUN pip install --upgrade pip
+
 # Set the working directory
 WORKDIR /app
 
@@ -19,3 +22,4 @@ RUN pip install --no-cache-dir .
 
 # Default command (can be overridden)
 CMD ["python", "--version"]
+CMD ["python", "train.py"]

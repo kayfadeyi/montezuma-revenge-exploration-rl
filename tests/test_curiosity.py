@@ -1,6 +1,7 @@
 import unittest
 import torch
-from src.exploration.curiosity import CuriosityModule
+from exploration.curiosity import CuriosityModule
+
 
 class TestCuriosity(unittest.TestCase):
     def setUp(self):
@@ -30,6 +31,7 @@ class TestCuriosity(unittest.TestCase):
         action = torch.randint(0, self.action_dim, (batch_size,)).to(self.device)
         next_features = self.curiosity.forward_dynamics(state_features, action)
         self.assertEqual(next_features.shape, (batch_size, self.curiosity.feature_dim))
+
 
 if __name__ == '__main__':
     unittest.main()
