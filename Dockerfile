@@ -18,4 +18,4 @@ COPY . .
 RUN pip install --no-cache-dir .
 
 # Default command (can be overridden)
-CMD ["python --version"]
+CMD ["python", "--version"]
