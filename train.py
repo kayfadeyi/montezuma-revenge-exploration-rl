@@ -158,7 +158,7 @@ class TrainModel:
 
         # Larger replay buffer
         # Modified to smaller buffer size (20K)
-        memory = PrioritizedReplayBuffer(20000)
+        memory = PrioritizedReplayBuffer(500) # TODO: Change back to 20000
         optimizer = torch.optim.Adam(online_net.parameters(), lr=learning_rate)
 
         # Training metrics
@@ -212,7 +212,7 @@ class TrainModel:
 
                 # Action selection with tracking
                 if np.random.random() < epsilon:
-                    action = env.action_space.sample()
+                    action = int(env.action_space.sample())
                     episode_random_actions += 1
                 else:
                     with torch.no_grad():
@@ -317,7 +317,8 @@ class TrainModel:
 
                # Monitor and clear GPU memory
                 if total_steps % 500 == 0 and device.type == 'cuda':
-                    print(torch.cuda.memory_summary(device=device, abbreviated=True))
+                    logging.info(torch.cuda.memory_summary(device=device, abbreviated=True))
+                    logging.info(torch.cuda.memory_allocated())
                     torch.cuda.empty_cache()
 
             # Episode completion

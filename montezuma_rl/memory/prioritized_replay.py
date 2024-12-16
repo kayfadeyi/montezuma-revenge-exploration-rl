@@ -3,6 +3,7 @@ from collections import namedtuple
 
 Transition = namedtuple('Transition', ('state', 'action', 'reward', 'next_state', 'done'))
 
+
 class SumTree:
     def __init__(self, capacity):
         self.capacity = capacity
@@ -49,6 +50,7 @@ class SumTree:
         idx = self._retrieve(0, s)
         dataIdx = idx - self.capacity + 1
         return (idx, self.tree[idx], self.data[dataIdx])
+
 
 class PrioritizedReplayBuffer:
     def __init__(self, capacity, alpha=0.6, beta=0.4):
