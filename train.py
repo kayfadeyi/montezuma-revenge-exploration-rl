@@ -74,7 +74,7 @@ class TrainModel:
 
     def train(self,
               num_episodes=10000,
-              batch_size=32,
+              batch_size=16,
               gamma=0.99,
               initial_exploration=1.0,
               final_exploration=0.85,
@@ -147,7 +147,8 @@ class TrainModel:
         reward_combiner = RewardCombiner(beta=0.8)
 
         # Larger replay buffer
-        memory = PrioritizedReplayBuffer(200000)
+        # Modified to smaller buffer size (20K)
+        memory = PrioritizedReplayBuffer(20000)
         optimizer = torch.optim.Adam(online_net.parameters(), lr=learning_rate)
 
         # Training metrics
