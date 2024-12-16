@@ -41,6 +41,7 @@ def load_checkpoint(path):
         return checkpoint
     return None
 
+
 def log_objgraph_growth():
     """Log the output of objgraph.show_growth to the logger."""
     growth_output = io.StringIO()  # Create an in-memory stream to capture output
@@ -48,6 +49,7 @@ def log_objgraph_growth():
     growth_output.seek(0)  # Move to the beginning of the stream
     logging.info("Objgraph Growth:\n%s", growth_output.read())  # Log the captured output
     growth_output.close()
+
 
 class TrainModel:
     def __init__(self, atari_environment, checkpoint_epoch=100, video_epoch=250):
@@ -82,7 +84,7 @@ class TrainModel:
         )
 
     def train(self,
-              num_episodes=10000,
+              num_episodes=20000,
               batch_size=16,
               gamma=0.99,
               initial_exploration=1.0,
@@ -158,7 +160,7 @@ class TrainModel:
 
         # Larger replay buffer
         # Modified to smaller buffer size (20K)
-        memory = PrioritizedReplayBuffer(500) # TODO: Change back to 20000
+        memory = PrioritizedReplayBuffer(1000)  # TODO: Change back to 20000?
         optimizer = torch.optim.Adam(online_net.parameters(), lr=learning_rate)
 
         # Training metrics
@@ -170,16 +172,13 @@ class TrainModel:
         exploration_actions = deque(maxlen=1000)
 
         # Load checkpoint if exists
-        checkpoint = load_checkpoint(checkpoint_path)
-        if checkpoint:
-            online_net.load_state_dict(checkpoint['online_net_state_dict'])
-            target_net.load_state_dict(checkpoint['target_net_state_dict'])
-            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-            start_episode = checkpoint['episode']
-            total_steps = checkpoint['total_steps']
-            best_reward = checkpoint.get('best_reward', float('-inf'))
-            episode_rewards = checkpoint.get('episode_rewards', [])
-            logging.info(f"Resuming from episode {start_episode}")
+        best_reward, episode_rewards, start_episode, total_steps = self.load_checkpoint_if_exists(best_reward,
+                                                                                                  checkpoint_path,
+                                                                                                  episode_rewards,
+                                                                                                  online_net, optimizer,
+                                                                                                  start_episode,
+                                                                                                  target_net,
+                                                                                                  total_steps)
 
         # Enhanced early stopping with longer patience
         patience = 1500  # Increased from 1000
@@ -197,11 +196,6 @@ class TrainModel:
             positions_this_episode = set()
 
             log_objgraph_growth()
-            if episode % 50 == 0:
-                objgraph.show_backrefs(
-                    objgraph.by_type('Tensor')[0],
-                    filename=f'backrefs_episode_{episode}.png'
-                )
 
             while not (done or truncated):
                 # Enhanced exploration strategy
@@ -315,7 +309,7 @@ class TrainModel:
                     target_net.load_state_dict(online_net.state_dict())
                     logging.info("Updated target network")
 
-               # Monitor and clear GPU memory
+                # Monitor and clear GPU memory
                 if total_steps % 500 == 0 and device.type == 'cuda':
                     logging.info(torch.cuda.memory_summary(device=device, abbreviated=True))
                     logging.info(torch.cuda.memory_allocated())
@@ -386,6 +380,20 @@ class TrainModel:
         env.close()
         logging.info("Training completed")
 
+    def load_checkpoint_if_exists(self, best_reward, checkpoint_path, episode_rewards, online_net, optimizer,
+                                  start_episode, target_net, total_steps):
+        checkpoint = load_checkpoint(checkpoint_path)
+        if checkpoint:
+            online_net.load_state_dict(checkpoint['online_net_state_dict'])
+            target_net.load_state_dict(checkpoint['target_net_state_dict'])
+            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            start_episode = checkpoint['episode']
+            total_steps = checkpoint['total_steps']
+            best_reward = checkpoint.get('best_reward', float('-inf'))
+            episode_rewards = checkpoint.get('episode_rewards', [])
+            logging.info(f"Resuming from episode {start_episode}")
+        return best_reward, episode_rewards, start_episode, total_steps
+
 
 if __name__ == '__main__':
     tm_breakout = TrainModel('ALE/Breakout-v5')
@@ -395,4 +403,3 @@ if __name__ == '__main__':
     tm_breakout.train()
     tm_pacman.train()
     tm_montezuma.train()
-
