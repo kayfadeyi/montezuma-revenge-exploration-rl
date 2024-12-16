@@ -298,6 +298,11 @@ class TrainModel:
                     target_net.load_state_dict(online_net.state_dict())
                     logging.info("Updated target network")
 
+               # Monitor and clear GPU memory
+                if total_steps % 500 == 0:
+                    print(torch.cuda.memory_summary(device=device, abbreviated=True))
+                    torch.cuda.empty_cache()
+
             # Episode completion
             last_steps.append(episode_steps)
             recent_rewards.append(episode_reward)
