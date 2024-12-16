@@ -160,7 +160,7 @@ class TrainModel:
 
         # Larger replay buffer
         # Modified to smaller buffer size (20K)
-        memory = PrioritizedReplayBuffer(1000)  # TODO: Change back to 20000?
+        memory = PrioritizedReplayBuffer(2500)  # TODO: Change back to 20000?
         optimizer = torch.optim.Adam(online_net.parameters(), lr=learning_rate)
 
         # Training metrics
