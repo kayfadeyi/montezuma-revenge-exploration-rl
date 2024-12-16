@@ -14,7 +14,8 @@ setup(
         "matplotlib>=3.4.3",
         "ale-py>=0.10.1",
         "moviepy>=2.1.1",
-        "pillow>=9.2.0,<11.0"
+        "pillow>=9.2.0,<11.0",
+        "objgraph>=3.6.2"
     ],
 )
 

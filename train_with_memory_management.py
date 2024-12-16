@@ -13,6 +13,7 @@ from gymnasium.wrappers import FrameStackObservation as FrameStack
 from gymnasium.wrappers import RecordEpisodeStatistics, RecordVideo
 from gymnasium.wrappers.atari_preprocessing import AtariPreprocessing
 from tqdm import tqdm
+import objgraph
 
 from montezuma_rl.exploration.curiosity import CuriosityModule
 from montezuma_rl.memory.prioritized_replay import PrioritizedReplayBuffer
@@ -97,6 +98,7 @@ class TrainModel:
         Training loop with optimizations for memory efficiency.
         """
         self.setup_logging()
+        objgraph.show_growth(limit=10)
 
         # Backup existing checkpoint
         checkpoint_dir = f'checkpoints/{self.atari_environment}'
@@ -176,6 +178,13 @@ class TrainModel:
             episode_reward = 0
             done = False
             truncated = False
+
+            objgraph.show_growth(limit=10)
+            if episode % 50 == 0:
+                objgraph.show_backrefs(
+                    objgraph.by_type('Tensor')[0],
+                    filename=f'backrefs_episode_{episode}.png'
+                )
 
             while not (done or truncated):
                 # Compute epsilon for exploration
