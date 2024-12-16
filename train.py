@@ -1,3 +1,4 @@
+import io
 import logging
 import os
 import shutil
@@ -7,6 +8,7 @@ from pathlib import Path
 
 import gymnasium as gym
 import numpy as np
+import objgraph
 import torch
 from ale_py import ALEInterface
 from gymnasium.wrappers import FrameStackObservation as FrameStack
@@ -39,6 +41,13 @@ def load_checkpoint(path):
         return checkpoint
     return None
 
+def log_objgraph_growth():
+    """Log the output of objgraph.show_growth to the logger."""
+    growth_output = io.StringIO()  # Create an in-memory stream to capture output
+    objgraph.show_growth(limit=10, file=growth_output)  # Redirect output to the stream
+    growth_output.seek(0)  # Move to the beginning of the stream
+    logging.info("Objgraph Growth:\n%s", growth_output.read())  # Log the captured output
+    growth_output.close()
 
 class TrainModel:
     def __init__(self, atari_environment, checkpoint_epoch=100, video_epoch=250):
@@ -86,6 +95,7 @@ class TrainModel:
         Enhanced training with aggressive exploration and rewards
         """
         self.setup_logging()
+        objgraph.show_growth(limit=10)
 
         # Backup existing checkpoint
         checkpoint_dir = f'checkpoints/{self.atari_environment}'
@@ -185,6 +195,13 @@ class TrainModel:
             done = False
             truncated = False
             positions_this_episode = set()
+
+            log_objgraph_growth()
+            if episode % 50 == 0:
+                objgraph.show_backrefs(
+                    objgraph.by_type('Tensor')[0],
+                    filename=f'backrefs_episode_{episode}.png'
+                )
 
             while not (done or truncated):
                 # Enhanced exploration strategy
@@ -299,7 +316,7 @@ class TrainModel:
                     logging.info("Updated target network")
 
                # Monitor and clear GPU memory
-                if total_steps % 500 == 0:
+                if total_steps % 500 == 0 and device.type == 'cuda':
                     print(torch.cuda.memory_summary(device=device, abbreviated=True))
                     torch.cuda.empty_cache()
 

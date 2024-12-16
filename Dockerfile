@@ -22,4 +22,4 @@ RUN pip install --no-cache-dir .
 
 # Default command (can be overridden)
 CMD ["python", "--version"]
-CMD ["python", "train_with_memory_management.py"]
+CMD ["python", "train.py"]
