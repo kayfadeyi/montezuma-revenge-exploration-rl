@@ -371,7 +371,7 @@ class TrainModel:
 
 if __name__ == '__main__':
     tm_breakout = TrainModel('ALE/Breakout-v5')
-    tm_pacman = TrainModel('MsPacman-v5')
+    tm_pacman = TrainModel('ALE/MsPacman-v5')
     tm_montezuma = TrainModel('ALE/MontezumaRevenge-v5')
 
     tm_breakout.train()
