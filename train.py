@@ -179,7 +179,7 @@ class TrainModel:
                                                                                                   total_steps)
 
         # Enhanced early stopping with longer patience
-        patience = 1500  # Increased from 1000
+        patience = 5000  # Increased from 1500
         episodes_without_improvement = 0
         min_reward_threshold = 100
 
