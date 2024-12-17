@@ -158,7 +158,7 @@ class TrainModel:
         )
         reward_combiner = RewardCombiner(beta=0.8)
 
-        memory = PrioritizedReplayBuffer(20000)
+        memory = PrioritizedReplayBuffer(5000)
         optimizer = torch.optim.Adam(online_net.parameters(), lr=learning_rate)
 
         # Training metrics
@@ -179,7 +179,7 @@ class TrainModel:
                                                                                                   total_steps)
 
         # Enhanced early stopping with longer patience
-        patience = 5000  # Increased from 1500
+        patience = 1500  # Increased from 1000
         episodes_without_improvement = 0
         min_reward_threshold = 100
 
@@ -204,7 +204,7 @@ class TrainModel:
 
                 # Action selection with tracking
                 if np.random.random() < epsilon:
-                    action = int(env.action_space.sample())
+                    action = env.action_space.sample()
                     episode_random_actions += 1
                 else:
                     with torch.no_grad():

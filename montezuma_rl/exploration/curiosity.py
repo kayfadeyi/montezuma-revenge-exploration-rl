@@ -99,7 +99,7 @@ class CuriosityModule:
             prediction_error = (l1_error + l2_error) / 2
 
             # Apply enhanced normalization
-            reward = self.reward_normalizer(prediction_error.detach().cpu().numpy())
+            reward = self.reward_normalizer(prediction_error.cpu().numpy())
             self.reward_memory.extend(reward)
 
             # Scale reward based on recent history
