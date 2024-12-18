@@ -396,8 +396,5 @@ class TrainModel:
 
 
 if __name__ == '__main__':
-    tm_breakout = TrainModel('ALE/Breakout-v5')
     tm_montezuma = TrainModel('ALE/MontezumaRevenge-v5')
-
-    tm_breakout.train(num_episodes=10000)
     tm_montezuma.train(num_episodes=50000)
