@@ -160,7 +160,7 @@ class TrainModel:
         )
         reward_combiner = RewardCombiner(beta=0.8)
 
-        memory = PrioritizedReplayBuffer(20000)  # From 5000
+        memory = PrioritizedReplayBuffer(50000)  # From 5000
         optimizer = torch.optim.Adam(online_net.parameters(), lr=learning_rate)
 
         # Training metrics
