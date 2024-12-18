@@ -15,7 +15,8 @@ setup(
         "ale-py>=0.10.1",
         "moviepy>=2.1.1",
         "pillow>=9.2.0,<11.0",
-        "objgraph>=3.6.2"
+        "objgraph>=3.6.2",
+        "tensorboard>=2.6.0"
     ],
 )
 

@@ -10,6 +10,7 @@ import gymnasium as gym
 import numpy as np
 import objgraph
 import torch
+from torch.utils.tensorboard import SummaryWriter
 from ale_py import ALEInterface
 from gymnasium.wrappers import FrameStackObservation as FrameStack
 from gymnasium.wrappers import RecordEpisodeStatistics, RecordVideo
@@ -56,11 +57,12 @@ class TrainModel:
         self.atari_environment = atari_environment
         self.checkpoint_epoch = checkpoint_epoch
         self.video_epoch = video_epoch
+        self.writer = SummaryWriter(log_dir=f"{self.atari_environment}/runs/experiment1")
 
     # UPDATED: More aggressive step bonus calculation
     def backup_checkpoint(self, src_path):
         """Create a backup of checkpoint file"""
-        backup_dir = f'checkpoints/{self.atari_environment}/backups'
+        backup_dir = f'{self.atari_environment}/checkpoints/backups'
         if os.path.exists(src_path):
             Path(backup_dir).mkdir(parents=True, exist_ok=True)
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -70,7 +72,7 @@ class TrainModel:
 
     def setup_logging(self):
         """Setup logging configuration"""
-        log_dir = Path(f'logs/{self.atari_environment}')
+        log_dir = Path(f'{self.atari_environment}/logs')
         log_dir.mkdir(parents=True, exist_ok=True)
 
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -100,7 +102,7 @@ class TrainModel:
         objgraph.show_growth(limit=10)
 
         # Backup existing checkpoint
-        checkpoint_dir = f'checkpoints/{self.atari_environment}'
+        checkpoint_dir = f'{self.atari_environment}/checkpoints'
         checkpoint_path = f'{checkpoint_dir}/training_state.pt'
         self.backup_checkpoint(checkpoint_path)
 
@@ -133,7 +135,7 @@ class TrainModel:
             env = FrameStack(env, stack_size=4)
             # Disable video and statistics during training for efficiency
             env = RecordEpisodeStatistics(env)
-            env = RecordVideo(env, video_folder=f"videos/{self.atari_environment}/training", name_prefix="training",
+            env = RecordVideo(env, video_folder=f"{self.atari_environment}/videos/training", name_prefix="training",
                               episode_trigger=lambda x: x % self.video_epoch == 0)
             logging.info("Environment created successfully")
 
@@ -158,7 +160,7 @@ class TrainModel:
         )
         reward_combiner = RewardCombiner(beta=0.8)
 
-        memory = PrioritizedReplayBuffer(20000) # From 5000
+        memory = PrioritizedReplayBuffer(20000)  # From 5000
         optimizer = torch.optim.Adam(online_net.parameters(), lr=learning_rate)
 
         # Training metrics
@@ -179,8 +181,8 @@ class TrainModel:
                                                                                                   total_steps)
 
         # Enhanced early stopping with longer patience
-        patience = 5000  # Increased from 1500
-        episodes_without_improvement = 0
+        # patience = 5000  # Increased from 1500
+        # episodes_without_improvement = 0
         min_reward_threshold = 100
 
         logging.info("Starting enhanced training loop")
@@ -295,8 +297,9 @@ class TrainModel:
                     # Optimize
                     optimizer.zero_grad()
                     loss.backward()
-                    torch.nn.utils.clip_grad_norm_(online_net.parameters(), max_norm=5.0) # Lower clipping threshold
+                    torch.nn.utils.clip_grad_norm_(online_net.parameters(), max_norm=5.0)  # Lower clipping threshold
                     optimizer.step()
+                    self.writer.add_scalar('Loss/Training', loss.item(), total_steps)
 
                     # Update priorities
                     priorities = (current_q.squeeze() - expected_q).abs().detach().cpu().numpy()
@@ -321,32 +324,33 @@ class TrainModel:
             avg_reward = np.mean(list(recent_rewards))
             exploration_ratio = np.mean(list(exploration_actions))
 
+            self.writer.add_scalar('Reward/Avg_Reward', avg_reward, episode)
+
             # Enhanced logging
             logging.info(f'Episode {episode} - Reward: {episode_reward:.2f}, '
                          f'Steps: {episode_steps}, Epsilon: {epsilon:.3f}, '
                          f'Avg Reward (100): {avg_reward:.2f}, '
                          f'Exploration Ratio: {exploration_ratio:.2f}, '
                          f'New Positions: {len(positions_this_episode)}')
+            self.writer.add_scalar('Reward/Episode', episode_reward, episode)
+            self.writer.add_scalar('Exploration/Epsilon', epsilon, episode)
+            self.writer.add_scalar('Steps/Per_Episode', episode_steps, episode)
 
             if episode_reward > 0:
                 logging.info(f"Non-zero reward achieved: {episode_reward}")
 
             # Save best model
-            if episode_reward > best_reward:
-                best_reward = episode_reward
-                episodes_without_improvement = 0
-                torch.save({
-                    'episode': episode,
-                    'online_net_state_dict': online_net.state_dict(),
-                    'target_net_state_dict': target_net.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                    'best_reward': best_reward,
-                    'episode_rewards': episode_rewards,
-                    'total_steps': total_steps
-                }, f'{checkpoint_dir}/model_best.pt')
-                logging.info(f"New best reward: {best_reward:.2f}")
-            else:
-                episodes_without_improvement += 1
+            best_reward = episode_reward
+            torch.save({
+                'episode': episode,
+                'online_net_state_dict': online_net.state_dict(),
+                'target_net_state_dict': target_net.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'best_reward': best_reward,
+                'episode_rewards': episode_rewards,
+                'total_steps': total_steps
+            }, f'{checkpoint_dir}/model_best.pt')
+            logging.info(f"New best reward: {best_reward:.2f}")
 
             # Regular checkpointing with backup
             if episode % self.checkpoint_epoch == 0:
@@ -365,19 +369,15 @@ class TrainModel:
             # UPDATED: More aggressive exploration reset
             if exploration_ratio < min_exploration_ratio and episode > 500:
                 logging.info("Restarting exploration due to low exploration ratio")
-                epsilon *= 1.1 #initial_exploration
+                epsilon *= 1.1  # initial_exploration
                 position_streak = 0  # Reset streak on exploration reset
-
-            # Enhanced early stopping
-            if episodes_without_improvement >= patience:
-                logging.info("Stopping early due to no improvement")
-                break
 
             if avg_reward >= min_reward_threshold:
                 logging.info("Stopping early due to reaching reward threshold")
                 break
 
         env.close()
+        self.writer.close()
         logging.info("Training completed")
 
     def load_checkpoint_if_exists(self, best_reward, checkpoint_path, episode_rewards, online_net, optimizer,
@@ -397,9 +397,7 @@ class TrainModel:
 
 if __name__ == '__main__':
     tm_breakout = TrainModel('ALE/Breakout-v5')
-    tm_pacman = TrainModel('ALE/MsPacman-v5')
     tm_montezuma = TrainModel('ALE/MontezumaRevenge-v5')
 
-    tm_breakout.train()
-    tm_pacman.train()
-    tm_montezuma.train()
+    tm_breakout.train(num_episodes=10000)
+    tm_montezuma.train(num_episodes=50000)
