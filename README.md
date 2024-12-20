@@ -1,22 +1,22 @@
 # Montezuma's Revenge Deep Reinforcement Learning
 
-This project implements an advanced Deep Reinforcement Learning solution for Montezuma's Revenge using curiosity-driven exploration and modern RL techniques.
+This project implements an advanced Deep Reinforcement Learning solution for Montezuma's Revenge, leveraging curiosity-driven exploration, enhanced GPU optimisation, and modern RL techniques.
 
 ## Features
 
 - Double DQN with Dueling Architecture
-- Prioritized Experience Replay
-- Curiosity-Driven Exploration
+- Prioritised Experience Replay
+- Intrinsic Curiosity Modules for Exploration
 - Frame Stacking and Preprocessing
 - Advanced Reward Shaping
-- Comprehensive Logging and Checkpointing
+- Comprehensive Logging, Checkpointing, and Visualisations
 
 ## Prerequisites
 
 - Python 3.11 or newer
 - macOS or Linux
 - At least 8GB RAM
-- (Optional) NVIDIA GPU with CUDA support
+- NVIDIA GPU with CUDA support (tested on AWS p3.2xlarge with Tesla V100)
 
 ## Installation
 
@@ -34,15 +34,9 @@ This project implements an advanced Deep Reinforcement Learning solution for Mon
 
 3. Install dependencies:
    ```bash
-   pip install gymnasium[atari]>=1.0.0
-   pip install torch>=1.9.0
-   pip install opencv-python>=4.5.3
-   pip install numpy>=1.19.5
-   pip install tqdm>=4.62.0
-   pip install matplotlib>=3.4.3
-   pip install ale-py>=0.10.1
-   pip install shimmy>=0.2.1
-   pip install "AutoROM[accept-rom-license]"
+   pip install gymnasium[atari]==0.28.0
+   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+   pip install opencv-python numpy tqdm matplotlib ale-py==0.10.0 shimmy "AutoROM[accept-rom-license]"
    ```
 
 ## Project Structure
@@ -56,10 +50,10 @@ montezuma-revenge-exploration-rl/
 │   ├── exploration/     # Curiosity-driven exploration
 ├── checkpoints/         # Saved models
 ├── logs/                # Training logs
-├── train.py             # Training script
+├── train_enhanced.py    # Training script
 ├── evaluate.py          # Evaluation script
+├── results/             # Training results and visualisations
 └── requirements.txt     # Project dependencies
-└── videos/              # Evaluation videos
 ```
 
 ## Running the Project
@@ -76,31 +70,26 @@ This should open a window showing Montezuma's Revenge with random actions.
 
 Start training:
 ```bash
-python train.py
+python train_enhanced.py
 ```
 
 The training process includes:
 
 - Automatic checkpointing every 100 episodes
 - Progress logging
-- Early stopping conditions
-- Performance metrics tracking
-- Curiosity-driven exploration
-- Adaptive reward scaling
+- Graph generation for training metrics
+- Intrinsic and extrinsic reward analysis
 
 #### Training Parameters
 
-Configurable in `train.py`:
+Configurable in `train_enhanced.py`:
 
-- `num_episodes`: Number of episodes (default: 2000)
+- `num_episodes`: Number of episodes (default: 50,000)
 - `batch_size`: Training batch size (default: 32)
 - `gamma`: Discount factor (default: 0.99)
-- `initial_exploration`: Starting exploration rate (default: 1.0)
-- `final_exploration`: Final exploration rate (default: 0.01)
-- `exploration_steps`: Number of exploration steps (default: 2000000)
-- `target_update_frequency`: Target update frequency (default: 5000)
+- `epsilon_decay_steps`: Exploration decay steps (default: 200,000)
+- `target_update_frequency`: Target update frequency (default: 5,000)
 - `learning_rate`: Learning rate (default: 0.0001)
-- `min_exploration_ratio`: Minimum exploration ratio (default: 0.9)
 
 ### Evaluation
 
@@ -114,9 +103,20 @@ python evaluate.py --model_path checkpoints/model_best.pt
 ### Training Logs
 
 Check the `logs/` directory for detailed training logs. Logs include:
-- Rewards
+- Rewards (extrinsic and intrinsic)
 - Steps
 - Exploration rate
+
+### Results and Graphs
+
+Training results are saved in the `results/` directory:
+
+1. **Cumulative Rewards Over Episodes:** Tracks total rewards, highlighting improvement phases.
+2. **Frames Per Reward:** Visualises efficiency gains during training.
+3. **State Coverage Heatmaps:** Illustrates exploration density at early and late phases.
+4. **Intrinsic vs Extrinsic Rewards:** Shows the dynamics of exploration and gameplay learning.
+
+All graphs are generated automatically at the end of training.
 
 ### Checkpoints
 
@@ -124,40 +124,31 @@ Check the `logs/` directory for detailed training logs. Logs include:
 - Regular checkpoints saved every 100 episodes
 - Checkpoints include:
   - Model state
-  - Optimizer state
+  - Optimiser state
   - Training statistics
 
 ### Early Stopping
 
-Training will automatically stop if:
-- No improvement for 1000 episodes
-- Reaches reward threshold (100)
-- Completes maximum episodes
+Training stops if:
+- No improvement for 5,000 episodes
+- Maximum reward threshold is reached
+- Completes all episodes
 
-## Customization
+## ESG Implications
 
-### Network Architecture
+This project incorporates ESG considerations:
 
-- Modify `models/dqn.py` for network changes
-- Adjust layer sizes and activation functions
+**Environmental:**
+- GPU optimisation reduces energy usage.
+- Potential to explore renewable-powered cloud setups in future work.
 
-### Exploration Strategy
+**Social:**
+- Makes RL research accessible through affordable cloud resources.
+- Contributions to open-source RL frameworks for broader benefits.
 
-- Modify `exploration/curiosity.py`
-- Adjust intrinsic reward scaling
-- Change feature encoding
-
-### Memory Management
-
-- Adjust buffer size in `memory/prioritized_replay.py`
-- Modify prioritization strategy
-- Change sampling parameters
-
-### Training Parameters
-
-- Adjust learning rate
-- Modify batch size
-- Change exploration schedule
+**Governance:**
+- Adheres to ethical AI standards in research and development.
+- Transparent sharing of methodologies and results.
 
 ## Troubleshooting
 
@@ -165,55 +156,20 @@ Training will automatically stop if:
 
 #### Out of Memory
 
-- Reduce batch size
-- Decrease replay buffer size
-- Use CPU if GPU memory is limited
+- Reduce batch size.
+- Decrease replay buffer size.
 
 #### Environment Creation Fails
+
+Ensure proper installation of Atari ROMs using:
 ```bash
-python test_env.py
+AutoROM --accept-license
 ```
 
 #### Training Stability
 
-- Adjust learning rate
-- Modify exploration parameters
-- Change network architecture
-
-### Evaluation
-
-To evaluate a trained model, use the evaluate.py script. Here are the basic usage patterns:
-
-#### Basic Evaluation
-```bash
-# Basic evaluation with rendering
-python evaluate.py --model_path checkpoints/model_best.pt --render
-
-# Run specific number of episodes without rendering
-python evaluate.py --model_path checkpoints/model_best.pt --episodes 20
-
-# Run multiple episodes with rendering
-python evaluate.py --model_path checkpoints/model_best.pt --episodes 20 --render
-```
-
-#### Evaluation Parameters
-
-- `--model_path`: Path to checkpoint file (required)
-- `--episodes`: Number of evaluation episodes (default: 10)
-- `--render`: Flag to enable visualization of gameplay (optional)
-
-#### Evaluation Metrics
-
-The evaluation provides the following metrics:
-
-- Episode rewards and steps
-- Unique positions visited per episode
-- Average reward across all episodes
-- Average steps across all episodes
-- Maximum reward achieved
-- Maximum steps reached in any episode
-
-The evaluation results are printed to the console after completion, showing both per-episode statistics and overall performance metrics.
+- Adjust learning rate.
+- Modify exploration parameters.
 
 ## License
 
@@ -223,11 +179,10 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 This implementation combines techniques from:
 
-- "Human-level control through deep reinforcement learning" (DQN)
-- "Deep Reinforcement Learning with Double Q-learning" (Double DQN)
-- "Dueling Network Architectures for Deep Reinforcement Learning" (Dueling DQN)
-- "Curiosity-driven Exploration by Self-supervised Prediction" (Intrinsic Rewards)
-- "Prioritized Experience Replay" (PER)
+- "Human-level control through deep reinforcement learning" (Mnih et al., 2015)
+- "Curiosity-driven Exploration by Self-supervised Prediction" (Pathak et al., 2017)
+- "Prioritised Experience Replay" (Schaul et al., 2016)
+- "Go-Explore: A New Approach for Hard-Exploration Problems" (Ecoffet et al., 2021)
 
 ## References
 
@@ -239,4 +194,5 @@ This implementation combines techniques from:
 6. Ecoffet, A., Huizinga, J., Lehman, J., Stanley, K.O., & Clune, J. (2019). Go-explore: a new approach for hard-exploration problems. *arXiv preprint arXiv:1901.10995*.
 7. Kulkarni, T.D., Narasimhan, K., Saeedi, A., & Tenenbaum, J. (2016). Hierarchical deep reinforcement learning: Integrating temporal abstraction and intrinsic motivation. *Advances in Neural Information Processing Systems, 29*, 3675-3683.
 8. Mnih, V., Kavukcuoglu, K., Silver, D., Rusu, A.A., Veness, J., Bellemare, M.G., Graves, A., Riedmiller, M., Fidjeland, A.K., Ostrovski, G., & Petersen, S. (2015). Human-level control through deep reinforcement learning. *Nature, 518*(7540), 529-533.
+9. Pathak, D., Agrawal, P., Efros, A.A., & Darrell, T. (2017). Curiosity-driven exploration by self-supervised prediction. *International Conference on Machine Learning*, 2778-2787.
 
