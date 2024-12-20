@@ -34,9 +34,7 @@ This project implements an advanced Deep Reinforcement Learning solution for Mon
 
 3. Install dependencies:
    ```bash
-   pip install gymnasium[atari]==0.28.0
-   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-   pip install opencv-python numpy tqdm matplotlib ale-py==0.10.0 shimmy "AutoROM[accept-rom-license]"
+   pip install -r requirements.txt
    ```
 
 ## Project Structure
